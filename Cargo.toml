@@ -11,4 +11,8 @@ sha2 = "0.10.8"
 sqlx = { version = "0.8.2", features = ["runtime-tokio-native-tls", "mysql"] }
 tokio = { version = "1.40.0", features = ["full"] }
 
-rocket = "0.5.1"
+serde = "1.0.210"
+serde_json = "1.0.128"
+axum = "0.7.6"
+
+rsa = "0.9.6"
