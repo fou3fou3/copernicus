@@ -1,5 +1,6 @@
 use std::error::Error;
 
+use askama::Template;
 use base64::{engine::general_purpose, Engine as _};
 use rsa::{
     pkcs1::{EncodeRsaPrivateKey, EncodeRsaPublicKey},
@@ -27,6 +28,12 @@ pub fn generate_rsa_keys() -> Result<(String, String), Box<dyn Error>> {
     let public_key_pem = public_key.to_pkcs1_pem(LineEnding::LF)?;
 
     Ok((private_key_pem.to_string(), public_key_pem))
+}
+
+#[derive(Template)]
+#[template(path = "get_user.html")]
+pub struct GetUserTemplate<'a> {
+    pub user_name: &'a str,
 }
 
 // AuthUser is the user type that we use to login/sign in (auth)

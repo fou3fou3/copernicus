@@ -1,12 +1,15 @@
 mod db;
+use askama::Template;
 use axum::{
     extract::{Extension, Path},
+    http::StatusCode,
+    response::{Html, IntoResponse},
     routing::{get, post},
     Json, Router,
 };
-use copernicus::{hash_password, AuthUser, InsertUser};
+use copernicus::{hash_password, AuthUser, GetUserTemplate, InsertUser};
 use db::init_db;
-use serde_json::{json, Value};
+use serde_json::json;
 use std::sync::Arc;
 
 const CONNECTION_STRING: &str = "mysql://admin:admin@localhost:3306/copernicus";
@@ -17,16 +20,22 @@ struct AppState {
 async fn post_api_signin(
     Extension(state): Extension<Arc<AppState>>,
     Json(user): Json<AuthUser>,
-) -> Json<Value> {
+) -> impl IntoResponse {
     match db::user_exists(&state.pool, user.user_name.as_str()).await {
         Ok(user_exists) => {
             if user_exists {
-                return Json(json!({"message": "user name already used", "code": 400}));
+                return (
+                    StatusCode::NOT_ACCEPTABLE,
+                    Json(json!({"message": "user name already used"})),
+                );
             }
         }
         Err(e) => {
             log::error!("failed to check if user exists {}", e);
-            return Json(json!({"message": "internal server error", "code": 500}));
+            return (
+                StatusCode::INTERNAL_SERVER_ERROR,
+                Json(json!({"message": "internal server error"})),
+            );
         }
     }
 
@@ -34,7 +43,10 @@ async fn post_api_signin(
         Ok((private_key, public_key)) => (private_key, public_key),
         Err(e) => {
             log::error!("failed to generate rsa keys {}", e);
-            return Json(json!({"message": "internal server error", "code": 500}));
+            return (
+                StatusCode::INTERNAL_SERVER_ERROR,
+                Json(json!({"message": "internal server error"})),
+            );
         }
     };
 
@@ -45,41 +57,63 @@ async fn post_api_signin(
     };
 
     match db::insert_user(&state.pool, user_to_be_inserted).await {
-        Ok(()) => Json(
-            json!({"message": "ok", "code": 200, "user_name": user.user_name, "private_key": private_key}),
+        Ok(()) => (
+            StatusCode::OK,
+            Json(json!({"message": "ok", "user_name": user.user_name, "private_key": private_key})),
         ),
         Err(e) => {
             log::error!("failed to insert user {}", e);
-            Json(json!({"message": "internal server error", "code": 500}))
+            (
+                StatusCode::INTERNAL_SERVER_ERROR,
+                Json(json!({"message": "internal server error"})),
+            )
         }
     }
 }
 
-async fn get_user(
+async fn get_api_user(
     Extension(state): Extension<Arc<AppState>>,
     Path(user_name): Path<String>,
-) -> Json<Value> {
+) -> impl IntoResponse {
     match db::user_exists(&state.pool, &user_name).await {
         Ok(user_exists) => {
             if !user_exists {
-                return Json(json!({"message": "user does not exist", "code": 400}));
+                return (
+                    StatusCode::NOT_ACCEPTABLE,
+                    Json(json!({"message": "user does not exist"})),
+                );
             }
         }
         Err(e) => {
             log::error!("failed to check if user exists {}", e);
-            return Json(json!({"message": "internal server error", "code": 500}));
+            return (
+                StatusCode::INTERNAL_SERVER_ERROR,
+                Json(json!({"message": "internal server error"})),
+            );
         }
     }
 
     match db::get_user(&state.pool, user_name).await {
-        Ok((user_name, public_key)) => Json(
-            json!({"message": "ok", "code": 200, "user_name": user_name, "public_key": public_key}),
+        Ok((user_name, public_key)) => (
+            StatusCode::OK,
+            Json(json!({"message": "ok",  "user_name": user_name, "public_key": public_key})),
         ),
         Err(e) => {
             log::error!("failed to get user {}", e);
-            Json(json!({"message": "internal server error", "code": 500}))
+            (
+                StatusCode::INTERNAL_SERVER_ERROR,
+                Json(json!({"message": "internal server error"})),
+            )
         }
     }
+}
+
+async fn get_user(Path(user_name): Path<String>) -> Html<String> {
+    let get_user_renderer = GetUserTemplate {
+        user_name: user_name.as_str(),
+    };
+
+    Html(get_user_renderer.render().unwrap()) // This wont panic unless there are not the necessary templates which are essential .
 }
 
 #[tokio::main]
@@ -95,7 +129,8 @@ async fn main() {
 
     let app = Router::new()
         .route("/api/signin", post(post_api_signin))
-        .route("/api/user/:user_name", get(get_user))
+        .route("/api/user/:user_name", get(get_api_user))
+        .route("/user/:user_name", get(get_user))
         .layer(Extension(shared_data));
 
     log::info!("initialized app");
