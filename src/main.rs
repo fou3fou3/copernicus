@@ -25,7 +25,7 @@ async fn post_api_signin(
             }
         }
         Err(e) => {
-            println!("{}", e);
+            log::error!("failed to check if user exists {}", e);
             return Json(json!({"message": "internal server error", "code": 500}));
         }
     }
@@ -33,7 +33,7 @@ async fn post_api_signin(
     let (private_key, public_key) = match copernicus::generate_rsa_keys() {
         Ok((private_key, public_key)) => (private_key, public_key),
         Err(e) => {
-            println!("{}", e);
+            log::error!("failed to generate rsa keys {}", e);
             return Json(json!({"message": "internal server error", "code": 500}));
         }
     };
@@ -49,7 +49,7 @@ async fn post_api_signin(
             json!({"message": "ok", "code": 200, "user_name": user.user_name, "private_key": private_key}),
         ),
         Err(e) => {
-            println!("{}", e);
+            log::error!("failed to insert user {}", e);
             Json(json!({"message": "internal server error", "code": 500}))
         }
     }
@@ -66,7 +66,7 @@ async fn get_user(
             }
         }
         Err(e) => {
-            println!("{}", e);
+            log::error!("failed to check if user exists {}", e);
             return Json(json!({"message": "internal server error", "code": 500}));
         }
     }
@@ -76,7 +76,7 @@ async fn get_user(
             json!({"message": "ok", "code": 200, "user_name": user_name, "public_key": public_key}),
         ),
         Err(e) => {
-            println!("{}", e);
+            log::error!("failed to get user {}", e);
             Json(json!({"message": "internal server error", "code": 500}))
         }
     }
@@ -84,7 +84,12 @@ async fn get_user(
 
 #[tokio::main]
 async fn main() {
+    env_logger::Builder::from_default_env()
+        .filter_level(log::LevelFilter::Info)
+        .init();
+
     let pool = init_db(CONNECTION_STRING).await.unwrap();
+    log::info!(target: "db_events", "sucessfully initialized db");
 
     let shared_data = Arc::new(AppState { pool });
 
@@ -93,6 +98,10 @@ async fn main() {
         .route("/api/user/:user_name", get(get_user))
         .layer(Extension(shared_data));
 
+    log::info!("initialized app");
+
     let listener = tokio::net::TcpListener::bind("0.0.0.0:3000").await.unwrap();
+    log::info!(target: "serving_events", "serving at 0.0.0.0:3000");
+
     axum::serve(listener, app).await.unwrap();
 }
