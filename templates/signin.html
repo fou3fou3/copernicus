@@ -1,0 +1,90 @@
+<!doctype html>
+<html lang="en">
+    <head>
+        <meta charset="UTF-8" />
+        <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+        <script
+            src="https://unpkg.com/htmx.org@2.0.2/dist/htmx.js"
+            integrity="sha384-yZq+5izaUBKcRgFbxgkRYwpHhHHCpp5nseXp0MEQ1A4MTWVMnqkmcuFez8x5qfxr"
+            crossorigin="anonymous"
+        ></script>
+        <script src="https://unpkg.com/htmx.org/dist/ext/json-enc.js"></script>
+        <title>Sign In</title>
+        <style>
+            #loading {
+                display: none;
+                color: #007bff;
+                font-weight: bold;
+                margin-top: 10px;
+            }
+            .htmx-request #loading {
+                display: block;
+            }
+            .htmx-request form {
+                opacity: 0.5;
+                pointer-events: none;
+            }
+        </style>
+    </head>
+    <body>
+        <h1>Sign In</h1>
+        <form
+            hx-post="/api/signin"
+            hx-ext="json-enc"
+            hx-target="#response"
+            hx-swap="innerHTML"
+            hx-indicator="#loading"
+        >
+            <div>
+                <label for="user_name">Username:</label>
+                <input type="text" id="user_name" name="user_name" required />
+            </div>
+            <div>
+                <label for="password">Password:</label>
+                <input type="password" id="password" name="password" required />
+            </div>
+            <button type="submit">Sign In</button>
+        </form>
+        <div id="loading">
+            <p>Signing in... Please wait.</p>
+            <img src="/api/placeholder/30/30" alt="Loading spinner" />
+        </div>
+        <div id="response"></div>
+
+        <script>
+            htmx.on("htmx:beforeRequest", function (event) {
+                document.getElementById("response").innerHTML = "";
+            });
+
+            htmx.on("htmx:afterRequest", function (event) {
+                var resultHtml;
+                if (event.detail.xhr.status === 200) {
+                    try {
+                        var response = JSON.parse(
+                            event.detail.xhr.responseText,
+                        );
+                        resultHtml =
+                            "<p>Welcome, " +
+                            response.user_name +
+                            "! Here is your private key: " +
+                            response.private_key +
+                            ". Please save it somewhere safe because you are going to need it to encrypt/decrypt messages and verify it's you.</p>";
+                    } catch (error) {
+                        console.error("Error parsing JSON:", error);
+                        resultHtml = "<p>Error parsing response</p>";
+                    }
+                } else if (event.detail.xhr.status === 406) {
+                    resultHtml =
+                        "<p>The username is already used. Try another one.</p>";
+                } else if (event.detail.xhr.status === 500) {
+                    resultHtml =
+                        "<p>Internal server error. Please try again later.</p>";
+                } else {
+                    resultHtml =
+                        "<p>An unexpected error occurred. Please try again.</p>";
+                }
+                document.getElementById("response").innerHTML = resultHtml;
+            });
+        </script>
+    </body>
+</html>
