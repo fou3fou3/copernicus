@@ -9,6 +9,19 @@
             crossorigin="anonymous"
         ></script>
         <title>{{ user_name }}</title>
+        <style>
+            pre {
+                background-color: #232c38;
+                padding: 15px;
+                border-radius: 5px;
+                font-family: monospace;
+                white-space: pre-wrap;
+                word-wrap: break-word;
+            }
+            .rsa-key {
+                color: #4caf50;
+            }
+        </style>
     </head>
     <body>
         <div
@@ -55,8 +68,8 @@
                             const jsonResponse = JSON.parse(
                                 event.detail.xhr.responseText,
                             );
-                            resultHtml = `<p>Name: ${jsonResponse.user_name}</p>
-                                          <p><pr>Public Key: ${jsonResponse.public_key}</pr></p>`;
+                            resultHtml = `<h2><p>Name: ${jsonResponse.user_name}</p></h2>
+                                          <h4><pre><code class="rsa-key">Public Key: ${jsonResponse.public_key}</code></h4></pre>`;
                         } catch (error) {
                             console.error("Error parsing JSON:", error);
                             document.getElementById("result").innerHTML =
