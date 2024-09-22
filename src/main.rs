@@ -10,7 +10,7 @@ use axum::{
 use copernicus::{hash_password, AuthUser, GetUserTemplate, InsertUser};
 use db::init_db;
 use serde_json::json;
-use std::sync::Arc;
+use std::{fs, sync::Arc};
 
 const CONNECTION_STRING: &str = "mysql://admin:admin@localhost:3306/copernicus";
 struct AppState {
@@ -116,6 +116,11 @@ async fn get_user(Path(user_name): Path<String>) -> Html<String> {
     Html(get_user_renderer.render().unwrap()) // This wont panic unless there are not the necessary templates which are essential .
 }
 
+async fn get_signin() -> Html<String> {
+    let html_content = fs::read_to_string("templates/signin.html").unwrap();
+    return Html(html_content);
+}
+
 #[tokio::main]
 async fn main() {
     env_logger::Builder::from_default_env()
@@ -131,6 +136,7 @@ async fn main() {
         .route("/api/signin", post(post_api_signin))
         .route("/api/user/:user_name", get(get_api_user))
         .route("/user/:user_name", get(get_user))
+        .route("/signin", get(get_signin))
         .layer(Extension(shared_data));
 
     log::info!("initialized app");
