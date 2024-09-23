@@ -2,10 +2,11 @@ mod db;
 use askama::Template;
 use axum::{
     extract::{Extension, Path},
-    http::StatusCode,
+    http::StatusCode, // its called header map you looking for authentication using bearer tokens
     response::{Html, IntoResponse},
     routing::{get, post},
-    Json, Router,
+    Json,
+    Router,
 };
 use copernicus::{
     create_jwt, generate_rsa_keys, hash_password, GetUserTemplate, InputUser, InsertUser,

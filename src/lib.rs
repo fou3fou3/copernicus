@@ -35,7 +35,7 @@ pub fn generate_rsa_keys() -> Result<(String, String), Box<dyn Error>> {
 
 pub fn create_jwt(user_name: String) -> Result<String, Box<dyn Error>> {
     let expiry_date = (SystemTime::now().duration_since(UNIX_EPOCH).unwrap()
-        + Duration::from_secs(100))
+        + Duration::from_secs(86400))
     .as_secs() as usize;
 
     let token = jsonwebtoken::encode(
