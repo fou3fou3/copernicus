@@ -7,7 +7,9 @@ use axum::{
     routing::{get, post},
     Json, Router,
 };
-use copernicus::{hash_password, AuthUser, GetUserTemplate, InsertUser};
+use copernicus::{
+    create_jwt, generate_rsa_keys, hash_password, GetUserTemplate, InputUser, InsertUser,
+};
 use db::init_db;
 use serde_json::json;
 use std::{fs, sync::Arc};
@@ -19,9 +21,9 @@ struct AppState {
 
 async fn post_api_signin(
     Extension(state): Extension<Arc<AppState>>,
-    Json(user): Json<AuthUser>,
+    Json(user): Json<InputUser>,
 ) -> impl IntoResponse {
-    match db::user_exists(&state.pool, user.user_name.as_str()).await {
+    match db::user_exists(&state.pool, &user.user_name).await {
         Ok(user_exists) => {
             if user_exists {
                 return (
@@ -39,7 +41,7 @@ async fn post_api_signin(
         }
     }
 
-    let (private_key, public_key) = match copernicus::generate_rsa_keys() {
+    let (private_key, public_key) = match generate_rsa_keys() {
         Ok((private_key, public_key)) => (private_key, public_key),
         Err(e) => {
             log::error!("failed to generate rsa keys {}", e);
@@ -69,6 +71,63 @@ async fn post_api_signin(
             )
         }
     }
+}
+
+async fn post_api_login(
+    Extension(state): Extension<Arc<AppState>>,
+    Json(user): Json<InputUser>,
+) -> impl IntoResponse {
+    match db::user_exists(&state.pool, &user.user_name).await {
+        Ok(user_exists) => {
+            if !user_exists {
+                return (
+                    StatusCode::NOT_ACCEPTABLE,
+                    Json(json!({"message": "user does not exist"})),
+                );
+            }
+        }
+        Err(e) => {
+            log::error!("failed to check if user exists {}", e);
+            return (
+                StatusCode::INTERNAL_SERVER_ERROR,
+                Json(json!({"message": "internal server error"})),
+            );
+        }
+    }
+
+    match db::get_user_password_hash(&state.pool, user.user_name.as_str()).await {
+        Ok(password_hash) => {
+            if password_hash != hash_password(user.password) {
+                return (
+                    StatusCode::UNAUTHORIZED,
+                    Json(json!({"message": "wrong password unauthorized"})),
+                );
+            }
+        }
+
+        Err(e) => {
+            log::error!("failed to retrieve the password hash {}", e);
+            return (
+                StatusCode::INTERNAL_SERVER_ERROR,
+                Json(json!({"message": "internal server error"})),
+            );
+        }
+    }
+
+    let token = match create_jwt(user.user_name.clone()) {
+        Ok(token) => token,
+        Err(e) => {
+            log::error!("failed to generate jwt key {}", e);
+            return (
+                StatusCode::INTERNAL_SERVER_ERROR,
+                Json(json!({"message": "internal server error"})),
+            );
+        }
+    };
+    (
+        StatusCode::OK,
+        Json(json!({"message": "ok", "user_name": user.user_name, "jwt_token": token})),
+    )
 }
 
 async fn get_api_user(
@@ -134,6 +193,7 @@ async fn main() {
 
     let app = Router::new()
         .route("/api/signin", post(post_api_signin))
+        .route("/api/login", post(post_api_login))
         .route("/api/user/:user_name", get(get_api_user))
         .route("/user/:user_name", get(get_user))
         .route("/signin", get(get_signin))
@@ -146,3 +206,5 @@ async fn main() {
 
     axum::serve(listener, app).await.unwrap();
 }
+
+// @TODO use environment variables to specify certain constants

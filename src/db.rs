@@ -51,6 +51,18 @@ pub async fn get_user(
     Ok(row)
 }
 
+pub async fn get_user_password_hash(
+    pool: &Pool<MySql>,
+    user_name: &str,
+) -> Result<String, sqlx::Error> {
+    let row =
+        sqlx::query_scalar::<_, String>("SELECT password_hash FROM users WHERE user_name = ?")
+            .bind(user_name)
+            .fetch_one(pool)
+            .await?;
+
+    Ok(row)
+}
 pub async fn user_exists(pool: &Pool<MySql>, user_name: &str) -> Result<bool, sqlx::Error> {
     let result = sqlx::query_scalar::<_, i64>("SELECT COUNT(*) FROM users WHERE user_name = ?")
         .bind(user_name)
