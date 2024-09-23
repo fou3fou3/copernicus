@@ -50,14 +50,15 @@ pub fn create_jwt(user_name: String) -> Result<String, Box<dyn Error>> {
     Ok(token)
 }
 
-pub fn authenticate_jwt(token: &str) -> Result<bool, Box<dyn Error>> {
-    jsonwebtoken::decode::<Claims>(
+pub fn authenticate_jwt(token: &str) -> Result<String, Box<dyn Error>> {
+    let claims = jsonwebtoken::decode::<Claims>(
         token,
         &jsonwebtoken::DecodingKey::from_secret("verysecretsecret".as_ref()),
         &jsonwebtoken::Validation::new(jsonwebtoken::Algorithm::HS256),
-    )?;
+    )?
+    .claims;
 
-    Ok(true)
+    Ok(claims.iss)
 }
 
 #[derive(Debug, Serialize, Deserialize)]
