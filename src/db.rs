@@ -1,4 +1,4 @@
-use copernicus::InsertUser;
+use copernicus::{InsertPost, InsertUser};
 use sqlx::{mysql::MySqlPoolOptions, MySql, Pool};
 use std::error::Error;
 
@@ -83,4 +83,14 @@ pub async fn user_exists(pool: &Pool<MySql>, user_name: &str) -> Result<bool, sq
         .await?;
 
     Ok(result > 0)
+}
+
+pub async fn insert_post(pool: &Pool<MySql>, insert_post: InsertPost) -> Result<(), sqlx::Error> {
+    sqlx::query("INSERT INTO users (user_name, content) VALUES (?, ?, ?)")
+        .bind(insert_post.user_name)
+        .bind(insert_post.content)
+        .execute(pool)
+        .await?;
+
+    Ok(())
 }
