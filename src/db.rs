@@ -86,7 +86,7 @@ pub async fn user_exists(pool: &Pool<MySql>, user_name: &str) -> Result<bool, sq
 }
 
 pub async fn insert_post(pool: &Pool<MySql>, insert_post: InsertPost) -> Result<(), sqlx::Error> {
-    sqlx::query("INSERT INTO users (user_name, content) VALUES (?, ?, ?)")
+    sqlx::query("INSERT INTO posts (user_name, content) VALUES (?, ?)")
         .bind(insert_post.user_name)
         .bind(insert_post.content)
         .execute(pool)

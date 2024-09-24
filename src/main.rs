@@ -2,14 +2,14 @@ mod db;
 use askama::Template;
 use axum::{
     extract::{Extension, Path},
-    http::StatusCode, // its called header map you looking for authentication using bearer tokens
+    http::{HeaderMap, StatusCode},
     response::{Html, IntoResponse},
     routing::{get, post},
-    Json,
-    Router,
+    Json, Router,
 };
 use copernicus::{
-    create_jwt, generate_rsa_keys, hash_password, GetUserTemplate, InputUser, InsertUser,
+    authenticate_jwt, create_jwt, generate_rsa_keys, hash_password, GetUserTemplate, InputUser,
+    InsertPost, InsertUser, PostStruct,
 };
 use db::init_db;
 use serde_json::json;
@@ -168,6 +168,90 @@ async fn get_api_user(
     }
 }
 
+async fn post_api_post(
+    headers: HeaderMap,
+    Extension(state): Extension<Arc<AppState>>,
+    Json(post_data): Json<PostStruct>,
+) -> impl IntoResponse {
+    let auth_header = match headers.get("Authorization") {
+        Some(header) => header,
+        None => {
+            return (
+                StatusCode::UNAUTHORIZED,
+                Json(json!({"message": "Missing Authorization header"})),
+            )
+        }
+    };
+
+    let auth_header_str = match auth_header.to_str() {
+        Ok(s) => s,
+        Err(_) => {
+            return (
+                StatusCode::UNAUTHORIZED,
+                Json(json!({"message": "Invalid Authorization header"})),
+            )
+        }
+    };
+
+    if let Some(token) = auth_header_str.strip_prefix("Bearer ") {
+        let user_name = match authenticate_jwt(token) {
+            Ok(user_name) => user_name,
+
+            Err(_) => {
+                return (
+                    StatusCode::UNAUTHORIZED,
+                    Json(json!({"message": "Invalid Authorization header format"})),
+                )
+            }
+        };
+
+        match db::user_exists(&state.pool, &user_name).await {
+            Ok(user_exists) => {
+                if !user_exists {
+                    return (
+                        StatusCode::NOT_ACCEPTABLE,
+                        Json(json!({"message": "user does not exist"})),
+                    );
+                }
+            }
+            Err(e) => {
+                log::error!("failed to check if user exists {}", e);
+                return (
+                    StatusCode::INTERNAL_SERVER_ERROR,
+                    Json(json!({"message": "internal server error"})),
+                );
+            }
+        }
+
+        match db::insert_post(
+            &state.pool,
+            InsertPost {
+                user_name: user_name.clone(),
+                content: post_data.content,
+            },
+        )
+        .await
+        {
+            Ok(()) => (
+                StatusCode::OK,
+                Json(json!({"message": "ok", "user_name": user_name})),
+            ),
+            Err(e) => {
+                log::error!("failed to insert post {}", e);
+                (
+                    StatusCode::INTERNAL_SERVER_ERROR,
+                    Json(json!({"message": "internal server error"})),
+                )
+            }
+        }
+    } else {
+        (
+            StatusCode::UNAUTHORIZED,
+            Json(json!({"message": "Invalid Authorization header format"})),
+        )
+    }
+}
+
 async fn get_user(Path(user_name): Path<String>) -> Html<String> {
     let get_user_renderer = GetUserTemplate {
         user_name: user_name.as_str(),
@@ -196,6 +280,7 @@ async fn main() {
         .route("/api/signin", post(post_api_signin))
         .route("/api/login", post(post_api_login))
         .route("/api/user/:user_name", get(get_api_user))
+        .route("/api/post", post(post_api_post))
         .route("/user/:user_name", get(get_user))
         .route("/signin", get(get_signin))
         .layer(Extension(shared_data));

@@ -90,3 +90,13 @@ pub struct InsertUser {
     pub password_hash: String,
     pub public_key: String,
 }
+
+#[derive(Deserialize)]
+pub struct PostStruct {
+    pub content: String,
+}
+
+pub struct InsertPost {
+    pub user_name: String,
+    pub content: String,
+}
