@@ -12,6 +12,7 @@ use rsa::{
 };
 use serde::{Deserialize, Serialize};
 use sha2::{Digest, Sha256};
+use sqlx::{FromRow, Row};
 
 pub fn hash_password(password: String) -> String {
     let mut hasher = Sha256::new();
@@ -92,11 +93,25 @@ pub struct InsertUser {
 }
 
 #[derive(Deserialize)]
-pub struct PostStruct {
+pub struct InputPost {
     pub content: String,
 }
 
 pub struct InsertPost {
     pub user_name: String,
     pub content: String,
+}
+
+pub struct PorfilePost {
+    pub id: i64,
+    pub content: String,
+}
+
+impl<'r> FromRow<'r, sqlx::mysql::MySqlRow> for PorfilePost {
+    fn from_row(row: &'r sqlx::mysql::MySqlRow) -> Result<Self, sqlx::Error> {
+        Ok(PorfilePost {
+            id: row.get("id"),
+            content: row.get("content"),
+        })
+    }
 }

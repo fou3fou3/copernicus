@@ -8,8 +8,8 @@ use axum::{
     Json, Router,
 };
 use copernicus::{
-    authenticate_jwt, create_jwt, generate_rsa_keys, hash_password, GetUserTemplate, InputUser,
-    InsertPost, InsertUser, PostStruct,
+    authenticate_jwt, create_jwt, generate_rsa_keys, hash_password, GetUserTemplate, InputPost,
+    InputUser, InsertPost, InsertUser,
 };
 use db::init_db;
 use serde_json::json;
@@ -131,7 +131,7 @@ async fn post_api_login(
     )
 }
 
-async fn get_api_user(
+async fn get_api_user_profile(
     Extension(state): Extension<Arc<AppState>>,
     Path(user_name): Path<String>,
 ) -> impl IntoResponse {
@@ -153,25 +153,26 @@ async fn get_api_user(
         }
     }
 
-    match db::get_user(&state.pool, user_name).await {
-        Ok((user_name, public_key)) => (
-            StatusCode::OK,
-            Json(json!({"message": "ok",  "user_name": user_name, "public_key": public_key})),
-        ),
+    let (user_name, public_key) = match db::get_user(&state.pool, &user_name).await {
+        Ok((user_name, public_key)) => (user_name, public_key),
         Err(e) => {
             log::error!("failed to get user {}", e);
-            (
+            return (
                 StatusCode::INTERNAL_SERVER_ERROR,
                 Json(json!({"message": "internal server error"})),
-            )
+            );
         }
-    }
+    };
+    (
+        StatusCode::OK,
+        Json(json!({"message": "ok",  "user_name": user_name, "public_key": public_key})),
+    )
 }
 
 async fn post_api_post(
     headers: HeaderMap,
     Extension(state): Extension<Arc<AppState>>,
-    Json(post_data): Json<PostStruct>,
+    Json(post_data): Json<InputPost>,
 ) -> impl IntoResponse {
     let auth_header = match headers.get("Authorization") {
         Some(header) => header,
@@ -252,12 +253,12 @@ async fn post_api_post(
     }
 }
 
-async fn get_user(Path(user_name): Path<String>) -> Html<String> {
+async fn get_user_profile(Path(user_name): Path<String>) -> Html<String> {
     let get_user_renderer = GetUserTemplate {
         user_name: user_name.as_str(),
     };
 
-    Html(get_user_renderer.render().unwrap()) // This wont panic unless there are not the necessary templates which are essential .
+    Html(get_user_renderer.render().unwrap())
 }
 
 async fn get_signin() -> Html<String> {
@@ -279,9 +280,9 @@ async fn main() {
     let app = Router::new()
         .route("/api/signin", post(post_api_signin))
         .route("/api/login", post(post_api_login))
-        .route("/api/user/:user_name", get(get_api_user))
+        .route("/api/user/:user_name", get(get_api_user_profile))
         .route("/api/post", post(post_api_post))
-        .route("/user/:user_name", get(get_user))
+        .route("/user/:user_name", get(get_user_profile))
         .route("/signin", get(get_signin))
         .layer(Extension(shared_data));
 
