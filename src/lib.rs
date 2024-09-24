@@ -102,6 +102,7 @@ pub struct InsertPost {
     pub content: String,
 }
 
+#[derive(Serialize)]
 pub struct PorfilePost {
     pub id: i64,
     pub content: String,

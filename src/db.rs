@@ -1,4 +1,4 @@
-use copernicus::{InsertPost, InsertUser, PorfilePost, PostStruct};
+use copernicus::{InsertPost, InsertUser, PorfilePost};
 use sqlx::{mysql::MySqlPoolOptions, MySql, Pool};
 use std::error::Error;
 
@@ -100,7 +100,7 @@ pub async fn get_user_posts(
     user_name: &str,
 ) -> Result<Vec<PorfilePost>, sqlx::Error> {
     let posts: Vec<PorfilePost> =
-        sqlx::query_as("SELECT id, content FROM users WHERE user_name = ?")
+        sqlx::query_as("SELECT id, content FROM posts WHERE user_name = ?")
             .bind(user_name)
             .fetch_all(pool)
             .await?;

@@ -163,9 +163,23 @@ async fn get_api_user_profile(
             );
         }
     };
+
+    let user_posts = match db::get_user_posts(&state.pool, &user_name).await {
+        Ok(posts) => posts,
+        Err(e) => {
+            log::error!("failed to get user posts {}", e);
+            return (
+                StatusCode::INTERNAL_SERVER_ERROR,
+                Json(json!({"message": "internal server error"})),
+            );
+        }
+    };
+
     (
         StatusCode::OK,
-        Json(json!({"message": "ok",  "user_name": user_name, "public_key": public_key})),
+        Json(
+            json!({"message": "ok",  "user_name": user_name, "public_key": public_key, "posts": user_posts}),
+        ),
     )
 }
 
