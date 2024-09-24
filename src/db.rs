@@ -21,6 +21,19 @@ pub async fn init_db(connection_string: &str) -> Result<Pool<MySql>, Box<dyn Err
     .execute(&pool)
     .await?; // @TODO add time created (account/user) and bio and other things yk..
 
+    sqlx::query(
+        r"
+        CREATE TABLE IF NOT EXISTS posts (
+            id INT PRIMARY KEY AUTO_INCREMENT,
+            user_name VARCHAR(255) NOT NULL,
+            content VARCHAR(500) NOT NULL,
+            FOREIGN KEY (user_name) REFERENCES users(user_name)
+        )
+        ",
+    )
+    .execute(&pool)
+    .await?;
+
     Ok(pool)
 }
 
